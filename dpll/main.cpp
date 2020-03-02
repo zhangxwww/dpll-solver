@@ -5,6 +5,24 @@
 #include "DimacsParser.h"
 #include "DPLL.h"
 
+// helper function to show a formula
+std::string show_formula(const formula& phi) {
+    std::stringstream ss;
+    ss << "(and" << std::endl;
+    for (const auto & clause : phi.clauses) {
+        ss << "  (or";
+        for (literal l : clause) {
+            if (POSITIVE(l)) ss << " " << l;
+            else ss << " (not " << VAR(l) << ")";
+        }
+        ss << ")" << std::endl;
+    }
+    ss << ")";
+
+    return ss.str();
+}
+
+// entry
 int main(int argc, char **argv) {
     if (argc < 2) {
         std::cerr << "error: no input files" << std::endl;
@@ -15,6 +33,7 @@ int main(int argc, char **argv) {
         std::string f(argv[i]);
         std::cout << f << std::endl;
         formula phi = DimacsParser::parse(f);
+        // std::cout << show_formula(phi) << std::endl;
 
         // timer start
         auto start = std::chrono::steady_clock::now();
@@ -36,8 +55,8 @@ int main(int argc, char **argv) {
             std::cout << "  unsat" << std::endl;
         }
 
-        auto duration = std::chrono::duration_cast<std::chrono::duration<double>>(end - start);
-        std::cout << "  time: " << duration.count() << std::endl;
+        auto duration = std::chrono::duration<float, std::milli>(end - start);
+        std::cout << "  time: " << duration.count() << " ms" << std::endl;
     }
 
     return 0;

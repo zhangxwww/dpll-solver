@@ -4,6 +4,8 @@
 
 #include <vector>
 #include <unordered_map>
+#include <string>
+#include <sstream>
 
 #ifndef DPLL_COMMON_H
 #define DPLL_COMMON_H
@@ -21,10 +23,23 @@ typedef int literal;
 typedef std::vector<literal> clause;
 
 // A formula is a list of clauses (meaning their conjunction).
-typedef std::vector<clause> formula;
+// We also specify the total number of variables, as some of them may not occur in any clause!
+struct formula {
+    int num_variable;
+    std::vector<clause> clauses;
+
+    formula(int n, const std::vector<clause>& clauses): num_variable(n), clauses(clauses) {}
+};
 
 // A satisfying model (interpretation).
 // e.g. `model[i] = false` means variable `i` is assigned to false.
 typedef std::unordered_map<int, bool> model;
+
+enum TrueValue {
+    True,
+    False,
+    Undef,
+    Unit
+};
 
 #endif //DPLL_COMMON_H

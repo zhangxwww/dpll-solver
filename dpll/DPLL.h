@@ -37,7 +37,12 @@ public:
 
 private:
     formula phi;
+
+
+
 };
+
+
 
 
 #endif //DPLL_DPLL_H
