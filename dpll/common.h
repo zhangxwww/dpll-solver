@@ -36,10 +36,15 @@ struct formula {
 typedef std::unordered_map<int, bool> model;
 
 enum TrueValue {
-    True,
-    False,
-    Undef,
-    Unit
+    TRUE,
+    FALSE,
+    UNDEF,
+    UNIT
+};
+
+enum Sign {
+    POS,
+    NEG
 };
 
 #endif //DPLL_COMMON_H

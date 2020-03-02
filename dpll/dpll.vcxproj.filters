@@ -24,12 +24,18 @@
     <ClInclude Include="DPLL.h">
       <Filter>头文件</Filter>
     </ClInclude>
+    <ClInclude Include="AtomList.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="DPLL.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
     <ClCompile Include="main.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="AtomList.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
   </ItemGroup>
