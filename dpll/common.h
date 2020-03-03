@@ -35,16 +35,4 @@ struct formula {
 // e.g. `model[i] = false` means variable `i` is assigned to false.
 typedef std::unordered_map<int, bool> model;
 
-enum TrueValue {
-    TRUE,
-    FALSE,
-    UNDEF,
-    UNIT
-};
-
-enum Sign {
-    POS,
-    NEG
-};
-
 #endif //DPLL_COMMON_H

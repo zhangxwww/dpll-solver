@@ -9,6 +9,18 @@
 
 #include "common.h"
 
+enum TrueValue {
+    TRUE,
+    FALSE,
+    UNDEF,
+    UNIT
+};
+
+enum Sign {
+    POS,
+    NEG
+};
+
 class DPLL {
 public:
     /**
@@ -38,8 +50,26 @@ public:
     model get_model();
 
 private:
+
+    bool use_backjump = false;
+
     void init();
     bool dfs();
+
+    bool sat() const;
+    bool conflict();
+    void decide();
+    bool hasDecision() const;
+    void backtrack();
+    void backjump();
+
+    int findNextUnusedAtom();
+
+    void decideLiteral(int liter);
+    void updateInterpretations(int idx, bool sign);
+    void updateClauseValue(int liter, int cidx, Sign literalSign);
+
+    bool sameSign(Sign s, bool pos);
 
     formula phi;
 
@@ -50,12 +80,23 @@ private:
     };
     typedef std::list<AtomInfo> AtomList;
 
-    AtomList assignedAtoms;
-    AtomList unassignedAtoms;
+    AtomList interpretations;
+
+    // atom (int) :-> bool whether the atom is used
+    std::vector<bool> usedAtom;
+    
+    std::list<int> decideChain;
+
+    int decidedCount = 0;
+
+    int conflictClause = -1;
+
+    int backtrackResult = 0;
 
     struct LiteralInfo {
         Sign sign = POS;
         int clause_index = 0;
+        LiteralInfo() : sign(POS), clause_index(0) {}
     };
     typedef std::list<LiteralInfo> LiteralInfoList;
 
@@ -69,8 +110,6 @@ private:
     //     unassigned literals in the clause
     std::vector<int> unassignedCount;
 };
-
-
 
 
 #endif //DPLL_DPLL_H
