@@ -69,6 +69,9 @@ private:
     void updateInterpretations(int idx, bool sign);
     void updateClauseValue(int liter, int cidx, Sign literalSign);
 
+    void updateClauseValue(const std::list<int>& cs);
+    TrueValue evalClause(int cidx) const;
+
     bool sameSign(Sign s, bool pos);
 
     formula phi;
@@ -80,7 +83,10 @@ private:
     };
     typedef std::list<AtomInfo> AtomList;
 
-    AtomList interpretations;
+    AtomList runningChain;
+
+    // atom (int) :-> Truevalue
+    std::vector<TrueValue> interpretations;
 
     // atom (int) :-> bool whether the atom is used
     std::vector<bool> usedAtom;

@@ -6,6 +6,7 @@
 
 DPLL::DPLL(const formula& phi) 
     :phi(phi), 
+     interpretations(phi.num_variable + 1, UNDEF),
      literalInfoMap(phi.num_variable + 1, nullptr),
      clauseValue(phi.clauses.size(), UNDEF),
      unassignedCount(phi.clauses.size(), 0),
@@ -56,16 +57,10 @@ bool DPLL::dfs() {
         decide();
         if (conflict()) {
             if (hasDecision()) {
-                if (!use_backjump) {
-                    //backtrack();
-                }
-                else {
-                    //backjump();
-                }
+                if (!use_backjump) { backtrack(); }
+                else { /*backjump();*/ }
             }
-            else {
-                return false;
-            }
+            else { return false; }
         }
         else if (sat()) {
             // generate model
@@ -106,6 +101,49 @@ bool DPLL::hasDecision() const {
     return decidedCount != 0;
 }
 
+void DPLL::backtrack() {
+    bool should_break = false;
+    int n_clause = phi.clauses.size();
+    std::vector<bool> markedClause(n_clause, false);
+    std::list<int> relatedClauses;
+    while (decidedCount > 0) {
+        auto last = runningChain.end();
+        if (!last->is_decide) {
+            // pop all p given by unit propagation
+            runningChain.pop_back();
+        }
+        else if (last->value == FALSE) {
+            // pop all not p given by decision
+            runningChain.pop_back();
+            decideChain.pop_back();
+            --decidedCount;
+        }
+        else {
+            backtrackResult = - *decideChain.end();
+            runningChain.pop_back();
+            decideChain.pop_back();
+            --decidedCount;
+            should_break = true;
+        }
+        int aidx = last->index;
+        interpretations[aidx] = UNDEF;
+        usedAtom[aidx] = false;
+        LiteralInfoList* infoList = literalInfoMap[aidx];
+        for (auto iter = infoList->begin();
+            iter != infoList->end();
+            ++iter) {
+            int cidx = iter->clause_index;
+            ++unassignedCount[cidx];
+            if (!markedClause[cidx]) {
+                markedClause[cidx] = true;
+                relatedClauses.push_back(cidx);
+            }
+        }
+        if (should_break) { break; }
+    }
+    updateClauseValue(relatedClauses);
+}
+
 int DPLL::findNextUnusedAtom() {
     if (backtrackResult != 0) {
         int res = backtrackResult;
@@ -140,18 +178,18 @@ void DPLL::decideLiteral(int liter) {
 
         updateClauseValue(liter, cidx, literalSign);
     }
-
     usedAtom[idx] = true;
     decideChain.push_back(liter);
     ++decidedCount;
 }
 
 void DPLL::updateInterpretations(int idx, bool sign) {
+    interpretations[idx] = sign ? TRUE : FALSE;
     AtomInfo info;
     info.index = idx;
     info.is_decide = true;
     info.value = sign ? TRUE : FALSE;
-    interpretations.push_back(info);
+    runningChain.push_back(info);
 }
 
 void DPLL::updateClauseValue(int liter, int cidx, Sign literalSign) {
