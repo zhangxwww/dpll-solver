@@ -67,10 +67,12 @@ private:
 
     void generateModel();
 
+    void propagateClause(int cidx);
+
     int findNextUnusedAtom() const;
 
     void decideAtom(int atom);
-    void updateInterpretations(int liter);
+    void updateInterpretations(int liter, bool is_decide);
     void updateClauseValue(int liter, int cidx, Sign literalSign);
 
     void updateClauseValue(const std::list<int>& cs);

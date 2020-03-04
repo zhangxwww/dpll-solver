@@ -100,27 +100,15 @@ bool DPLL::conflict() {
 
 bool DPLL::propagate() {
     int n_clause = phi.clauses.size();
-    int unitClauseIndex = -1;
     bool found = false;
     for (int i = 0; i < n_clause; ++i) {
         if (clauseValue[i] == UNIT) { 
-            unitClauseIndex = i;
             found = true;
+            propagateClause(i);
             break;
         }
     }
-    if (!found) { return false; }
-    clause c = phi.clauses[unitClauseIndex];
-    for (auto liter = c.begin();
-        liter != c.end();
-        ++liter) {
-        int atom = VAR(*liter);
-        bool sign = POSITIVE(*liter);
-        if (interpretations[atom] == UNDEF) {
-            updateInterpretations(*liter);
-        }
-    }
-    return true;
+    return found;
 }
 
 void DPLL::decide() {
@@ -178,6 +166,18 @@ void DPLL::generateModel() {
     }
 }
 
+void DPLL::propagateClause(int cidx) {
+    clause c = phi.clauses[cidx];
+    for (auto liter = c.begin();
+        liter != c.end();
+        ++liter) {
+        int atom = VAR(*liter);
+        if (interpretations[atom] == UNDEF) {
+            updateInterpretations(*liter, false);
+        }
+    }
+}
+
 int DPLL::findNextUnusedAtom() const {
     int last = *(--decideChain.end());
     int n_atoms = phi.num_variable;
@@ -187,13 +187,14 @@ int DPLL::findNextUnusedAtom() const {
 }
 
 void DPLL::decideAtom(int atom) {
-    updateInterpretations(atom);
+    updateInterpretations(atom, true);
     decideChain.push_back(atom);
 }
 
-void DPLL::updateInterpretations(int liter) {
+void DPLL::updateInterpretations(int liter, bool is_decide) {
     int idx = VAR(liter);
     bool sign = POSITIVE(liter);
+    interpretations[idx] = sign ? TRUE : FALSE;
     LiteralInfoList* infoList = literalInfoMap[idx];
     for (auto iter = infoList->begin();
         iter != infoList->end();
@@ -203,10 +204,9 @@ void DPLL::updateInterpretations(int liter) {
 
         updateClauseValue(liter, cidx, literalSign);
     }
-    interpretations[idx] = sign ? TRUE : FALSE;
     AtomInfo info;
     info.index = idx;
-    info.is_decide = true;
+    info.is_decide = is_decide;
     info.value = sign ? TRUE : FALSE;
     runningChain.push_back(info);
 }
@@ -247,20 +247,13 @@ TrueValue DPLL::evalClause(int cidx) const {
 
         int atom = VAR(*l);
         TrueValue inter = interpretations[atom];
-        if (inter == TRUE && POSITIVE(*l)) {
-            return TRUE;
-        }
-        else if (inter == FALSE && NEGATIVE(*l)) {
-            return TRUE;
-        }
-        else if (inter == UNDEF) {
-            ++n_undef;
-            if (n_undef == 2) {
-                return UNDEF;
-            }
-        }
+        if (inter == TRUE && POSITIVE(*l)) { return TRUE; }
+        else if (inter == FALSE && NEGATIVE(*l)) { return TRUE; }
+        else if (inter == UNDEF) { ++n_undef; }
     }
-    return n_undef == 1 ? UNIT : FALSE;
+    if (n_undef == 1) { return UNIT; }
+    else if (n_undef > 1) { return UNDEF; }
+    else { return FALSE; }
 }
 
 bool DPLL::sameSign(Sign s, bool pos) {
