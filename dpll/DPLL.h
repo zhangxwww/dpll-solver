@@ -30,6 +30,7 @@ public:
      * @note Please DON'T CHANGE this signature because the grading script will directly call this function!
      */
     DPLL(const formula& phi);
+    ~DPLL();
 
     /**
      * Check if the formula is satisfiable.
@@ -58,14 +59,15 @@ private:
 
     bool sat() const;
     bool conflict();
+    bool propagate();
     void decide();
     bool hasDecision() const;
     void backtrack();
     void backjump();
 
-    int findNextUnusedAtom();
+    int findNextUnusedAtom() const;
 
-    void decideLiteral(int liter);
+    void decideAtom(int atom);
     void updateInterpretations(int idx, bool sign);
     void updateClauseValue(int liter, int cidx, Sign literalSign);
 
@@ -91,18 +93,14 @@ private:
     // atom (int) :-> bool whether the atom is used
     std::vector<bool> usedAtom;
     
+    // last decided atom
     std::list<int> decideChain;
 
-    int decidedCount = 0;
-
     int conflictClause = -1;
-
-    int backtrackResult = 0;
 
     struct LiteralInfo {
         Sign sign = POS;
         int clause_index = 0;
-        LiteralInfo() : sign(POS), clause_index(0) {}
     };
     typedef std::list<LiteralInfo> LiteralInfoList;
 

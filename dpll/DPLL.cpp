@@ -12,6 +12,15 @@ DPLL::DPLL(const formula& phi)
      unassignedCount(phi.clauses.size(), 0),
      usedAtom(phi.num_variable + 1, false) {}
 
+DPLL::~DPLL() {
+    int n = phi.num_variable + 1;
+    for (int i = 0; i < n; ++i) {
+        if (literalInfoMap[i] != nullptr) {
+            delete literalInfoMap[i];
+        }
+    }
+}
+
 bool DPLL::check_sat() {
     // TODO: your code here, or in the header file
     init();
@@ -51,9 +60,7 @@ void DPLL::init() {
 
 bool DPLL::dfs() {
     while (true) {
-        while (false) {
-            // propagate
-        }
+        while (propagate());
         decide();
         if (conflict()) {
             if (hasDecision()) {
@@ -62,7 +69,7 @@ bool DPLL::dfs() {
             }
             else { return false; }
         }
-        else if (sat()) {
+        if (sat()) {
             // generate model
             return true;
         }
@@ -92,13 +99,17 @@ bool DPLL::conflict() {
     return false;
 }
 
+bool DPLL::propagate() {
+    return false;
+}
+
 void DPLL::decide() {
     int atom = findNextUnusedAtom();
-    decideLiteral(atom);
+    decideAtom(atom);
 }
 
 bool DPLL::hasDecision() const {
-    return decidedCount != 0;
+    return decideChain.size() > 1;
 }
 
 void DPLL::backtrack() {
@@ -106,34 +117,30 @@ void DPLL::backtrack() {
     int n_clause = phi.clauses.size();
     std::vector<bool> markedClause(n_clause, false);
     std::list<int> relatedClauses;
-    while (decidedCount > 0) {
-        auto last = runningChain.end();
+    while (decideChain.size() > 1) {
+        auto last = --runningChain.end();
+        int aidx = last->index;
+        bool unassign = false;
         if (!last->is_decide) {
             // pop all p given by unit propagation
             runningChain.pop_back();
-        }
-        else if (last->value == FALSE) {
-            // pop all not p given by decision
-            runningChain.pop_back();
-            decideChain.pop_back();
-            --decidedCount;
+            interpretations[aidx] = UNDEF;
+            usedAtom[aidx] = false;
+            unassign = true;
         }
         else {
-            backtrackResult = - *decideChain.end();
-            runningChain.pop_back();
+            last->is_decide = false;
+            last->value = FALSE;
             decideChain.pop_back();
-            --decidedCount;
             should_break = true;
+            interpretations[aidx] = FALSE;
         }
-        int aidx = last->index;
-        interpretations[aidx] = UNDEF;
-        usedAtom[aidx] = false;
         LiteralInfoList* infoList = literalInfoMap[aidx];
         for (auto iter = infoList->begin();
             iter != infoList->end();
             ++iter) {
             int cidx = iter->clause_index;
-            ++unassignedCount[cidx];
+            if (unassign) { ++unassignedCount[cidx]; }
             if (!markedClause[cidx]) {
                 markedClause[cidx] = true;
                 relatedClauses.push_back(cidx);
@@ -144,28 +151,15 @@ void DPLL::backtrack() {
     updateClauseValue(relatedClauses);
 }
 
-int DPLL::findNextUnusedAtom() {
-    if (backtrackResult != 0) {
-        int res = backtrackResult;
-        backtrackResult = 0;
-        return res;
-    }
-    int last = *decideChain.end();
-    if (last == 0) {
-        return 1;
-    }
-    while (true) {
-        last = last > 0 ? -last : -last + 1;
-        if (!usedAtom[VAR(last)]) {
-            return last;
-        }
-    }
-    return 0;
+int DPLL::findNextUnusedAtom() const {
+    int last = *(--decideChain.end());
+    while (usedAtom[++last]);
+    return last;
 }
 
-void DPLL::decideLiteral(int liter) {
-    int idx = VAR(liter);
-    bool sign = POSITIVE(liter);
+void DPLL::decideAtom(int atom) {
+    int idx = VAR(atom);
+    bool sign = POSITIVE(atom);
 
     updateInterpretations(idx, sign);
 
@@ -176,11 +170,10 @@ void DPLL::decideLiteral(int liter) {
         Sign literalSign = iter->sign;
         int cidx = iter->clause_index;
 
-        updateClauseValue(liter, cidx, literalSign);
+        updateClauseValue(atom, cidx, literalSign);
     }
     usedAtom[idx] = true;
-    decideChain.push_back(liter);
-    ++decidedCount;
+    decideChain.push_back(atom);
 }
 
 void DPLL::updateInterpretations(int idx, bool sign) {
@@ -200,18 +193,48 @@ void DPLL::updateClauseValue(int liter, int cidx, Sign literalSign) {
         }
     }
     else if (clauseValue[cidx] == UNIT) {
-        if (sameSign(literalSign, sign)) {
-            clauseValue[cidx] = TRUE;
-        }
-        else {
-            clauseValue[cidx] = FALSE;
-        }
+        clauseValue[cidx] = sameSign(literalSign, sign) ?
+            TRUE : FALSE;
     }
     --unassignedCount[cidx];
     if (clauseValue[cidx] == UNDEF
         && unassignedCount[cidx] == 1) {
         clauseValue[cidx] = UNIT;
     }
+}
+
+void DPLL::updateClauseValue(const std::list<int>& cs) {
+    for (auto c = cs.begin();
+        c != cs.end();
+        ++c) {
+
+        clauseValue[*c] = evalClause(*c);
+    }
+}
+
+TrueValue DPLL::evalClause(int cidx) const {
+    clause cls = phi.clauses[cidx];
+    int n_undef = 0;
+    for (auto l = cls.begin();
+        l != cls.end();
+        ++l) {
+
+        int atom = VAR(*l);
+        TrueValue inter = interpretations[atom];
+        if (inter == TRUE && POSITIVE(*l)) {
+            return TRUE;
+        }
+        else if (inter == FALSE && NEGATIVE(*l)) {
+            return TRUE;
+        }
+        else if (inter == UNDEF) {
+            ++n_undef;
+            if (n_undef == 2) {
+                return UNDEF;
+            }
+        }
+    }
+    return n_undef == 1 ? UNIT : FALSE;
 }
 
 bool DPLL::sameSign(Sign s, bool pos) {
