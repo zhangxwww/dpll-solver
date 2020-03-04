@@ -9,8 +9,7 @@ DPLL::DPLL(const formula& phi)
      interpretations(phi.num_variable + 1, UNDEF),
      literalInfoMap(phi.num_variable + 1, nullptr),
      clauseValue(phi.clauses.size(), UNDEF),
-     unassignedCount(phi.clauses.size(), 0),
-     usedAtom(phi.num_variable + 1, false) {}
+     unassignedCount(phi.clauses.size(), 0) {}
 
 DPLL::~DPLL() {
     int n = phi.num_variable + 1;
@@ -29,7 +28,7 @@ bool DPLL::check_sat() {
 
 model DPLL::get_model() {
     // TODO: your code here, or in the header file
-    return model();
+    return finalModel;
 }
 
 void DPLL::init() {
@@ -70,7 +69,7 @@ bool DPLL::dfs() {
             else { return false; }
         }
         if (sat()) {
-            // generate model
+            generateModel();
             return true;
         }
     }
@@ -100,11 +99,33 @@ bool DPLL::conflict() {
 }
 
 bool DPLL::propagate() {
-    return false;
+    int n_clause = phi.clauses.size();
+    int unitClauseIndex = -1;
+    bool found = false;
+    for (int i = 0; i < n_clause; ++i) {
+        if (clauseValue[i] == UNIT) { 
+            unitClauseIndex = i;
+            found = true;
+            break;
+        }
+    }
+    if (!found) { return false; }
+    clause c = phi.clauses[unitClauseIndex];
+    for (auto liter = c.begin();
+        liter != c.end();
+        ++liter) {
+        int atom = VAR(*liter);
+        bool sign = POSITIVE(*liter);
+        if (interpretations[atom] == UNDEF) {
+            updateInterpretations(*liter);
+        }
+    }
+    return true;
 }
 
 void DPLL::decide() {
     int atom = findNextUnusedAtom();
+    if (atom == phi.num_variable + 1) { return; }
     decideAtom(atom);
 }
 
@@ -125,7 +146,6 @@ void DPLL::backtrack() {
             // pop all p given by unit propagation
             runningChain.pop_back();
             interpretations[aidx] = UNDEF;
-            usedAtom[aidx] = false;
             unassign = true;
         }
         else {
@@ -151,18 +171,29 @@ void DPLL::backtrack() {
     updateClauseValue(relatedClauses);
 }
 
+void DPLL::generateModel() {
+    int n = phi.num_variable;
+    for (int i = 1; i <= n; ++i) {
+        finalModel[i] = interpretations[i] == TRUE;
+    }
+}
+
 int DPLL::findNextUnusedAtom() const {
     int last = *(--decideChain.end());
-    while (usedAtom[++last]);
+    int n_atoms = phi.num_variable;
+    while (last++ < n_atoms
+        && interpretations[last] != UNDEF);
     return last;
 }
 
 void DPLL::decideAtom(int atom) {
-    int idx = VAR(atom);
-    bool sign = POSITIVE(atom);
+    updateInterpretations(atom);
+    decideChain.push_back(atom);
+}
 
-    updateInterpretations(idx, sign);
-
+void DPLL::updateInterpretations(int liter) {
+    int idx = VAR(liter);
+    bool sign = POSITIVE(liter);
     LiteralInfoList* infoList = literalInfoMap[idx];
     for (auto iter = infoList->begin();
         iter != infoList->end();
@@ -170,13 +201,8 @@ void DPLL::decideAtom(int atom) {
         Sign literalSign = iter->sign;
         int cidx = iter->clause_index;
 
-        updateClauseValue(atom, cidx, literalSign);
+        updateClauseValue(liter, cidx, literalSign);
     }
-    usedAtom[idx] = true;
-    decideChain.push_back(atom);
-}
-
-void DPLL::updateInterpretations(int idx, bool sign) {
     interpretations[idx] = sign ? TRUE : FALSE;
     AtomInfo info;
     info.index = idx;

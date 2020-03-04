@@ -65,10 +65,12 @@ private:
     void backtrack();
     void backjump();
 
+    void generateModel();
+
     int findNextUnusedAtom() const;
 
     void decideAtom(int atom);
-    void updateInterpretations(int idx, bool sign);
+    void updateInterpretations(int liter);
     void updateClauseValue(int liter, int cidx, Sign literalSign);
 
     void updateClauseValue(const std::list<int>& cs);
@@ -90,8 +92,6 @@ private:
     // atom (int) :-> Truevalue
     std::vector<TrueValue> interpretations;
 
-    // atom (int) :-> bool whether the atom is used
-    std::vector<bool> usedAtom;
     
     // last decided atom
     std::list<int> decideChain;
@@ -113,6 +113,8 @@ private:
     // index of clause :-> count of 
     //     unassigned literals in the clause
     std::vector<int> unassignedCount;
+
+    model finalModel;
 };
 
 
