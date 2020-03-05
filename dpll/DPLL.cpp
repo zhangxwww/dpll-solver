@@ -221,7 +221,7 @@ void DPLL::backjump() {
         if (should_break) { break; }
     }
     updateClauseValue(relatedClauses);
-    destroyGraph(conflictDecisions, lastDecide);
+    destroyGraph(conflictDecisions);
     conflictNodeIndex = 0;
     conflictClause = -1;
 }
@@ -380,7 +380,7 @@ void DPLL::destroyGraph(const std::set<int>& conflicts) {
         }
         conflictGraph[atom].parents.clear();
         conflictGraph[atom].decideNodes.clear();
-        destroyGraph(conflictGraph[atom].propagations, -1);
+        destroyGraph(conflictGraph[atom].propagations);
         conflictGraph[atom].propagations.clear();
     }
 }
