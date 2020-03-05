@@ -6,6 +6,7 @@
 #define DPLL_DPLL_H
 
 #include <list>
+#include <set>
 
 #include "common.h"
 
@@ -58,7 +59,7 @@ private:
     bool dfs();
 
     bool sat() const;
-    bool conflict();
+    bool conflict() const;
     bool propagate();
     void decide();
     bool hasDecision() const;
@@ -67,16 +68,19 @@ private:
 
     void generateModel();
 
-    void propagateClause(int cidx);
+    bool propagateClause(int cidx);
 
     int findNextUnusedAtom() const;
 
     void decideAtom(int atom);
-    void updateInterpretations(int liter, bool is_decide);
-    void updateClauseValue(int liter, int cidx, Sign literalSign);
+    bool updateInterpretations(int liter, bool is_decide);
+    bool updateClauseValue(int liter, int cidx, Sign literalSign);
 
-    void updateClauseValue(const std::list<int>& cs);
+    bool updateClauseValue(const std::list<int>& cs);
     TrueValue evalClause(int cidx) const;
+
+    void addNewClause(const std::set<int>& conflicts);
+    void destroyGraph(const std::set<int>& conflicts);
 
     bool sameSign(Sign s, bool pos);
 
@@ -98,7 +102,6 @@ private:
     // last decided atom
     std::list<int> decideChain;
 
-    int conflictClause = -1;
 
     struct LiteralInfo {
         Sign sign = POS;
@@ -115,6 +118,21 @@ private:
     // index of clause :-> count of 
     //     unassigned literals in the clause
     std::vector<int> unassignedCount;
+
+    struct GraphNode {
+        bool isDecide = false;
+        unsigned int decideLevel = 0xffffffff;
+        std::set<int> propagations;
+        std::set<int> parents;
+        std::set<int> decideNodes;
+    };
+
+    typedef std::vector<GraphNode> Graph;
+
+    Graph conflictGraph;
+
+    int conflictNodeIndex = 0;
+    int conflictClause = -1;
 
     model finalModel;
 };
