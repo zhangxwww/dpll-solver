@@ -60,6 +60,7 @@ void DPLL::init() {
 
 bool DPLL::dfs() {
     while (true) {
+        ++round;
         while (propagate());
         decide();
         if (conflict()) {
@@ -110,6 +111,7 @@ bool DPLL::propagate() {
 }
 
 void DPLL::decide() {
+    if (conflictClause != -1) { return; }
     int atom = findNextUnusedAtom();
     if (atom == phi.num_variable + 1) { return; }
     decideAtom(atom);
@@ -124,6 +126,7 @@ void DPLL::backtrack() {
     int n_clause = phi.clauses.size();
     std::vector<bool> markedClause(n_clause, false);
     std::list<int> relatedClauses;
+    std::vector<int> decrepatedNodes;
     while (decideChain.size() > 1) {
         auto last = --runningChain.end();
         int aidx = last->index;
@@ -150,34 +153,58 @@ void DPLL::backtrack() {
                 relatedClauses.push_back(cidx);
             }
         }
+        if (use_backjump) { decrepatedNodes.push_back(aidx); }
         if (should_break) { break; }
     }
     updateClauseValue(relatedClauses);
+    if (use_backjump) { destroyGraph(decrepatedNodes); }
     conflictNodeIndex = 0;
     conflictClause = -1;
 }
 
 void DPLL::backjump() {
+    if (conflictNodeIndex == 0) {
+        backtrack();
+        return;
+    }
     std::set<int> conflictDecisions;
     conflictDecisions.insert(
         conflictGraph[conflictNodeIndex].decideNodes.begin(),
         conflictGraph[conflictNodeIndex].decideNodes.end()
     );
     for (int liter : phi.clauses[conflictClause]) {
-        if (liter != conflictNodeIndex) {
+        int atom = VAR(liter);
+        if (atom != conflictNodeIndex) {
             conflictDecisions.insert(
-                conflictGraph[liter].decideNodes.begin(),
-                conflictGraph[liter].decideNodes.end()
+                conflictGraph[atom].decideNodes.begin(),
+                conflictGraph[atom].decideNodes.end()
             );
         }
     }
+    if (conflictDecisions.size() == 0) {
+        conflictClause = -1;
+        conflictNodeIndex = 0;
+        backtrack();
+        return;
+    }
 
+    int chainSize = decideChain.size();
+    int first = -1;
+    if (chainSize > 2) {
+        first = *(++decideChain.begin());
+    }
     addNewClause(conflictDecisions);
 
-    unsigned int minLevel = decideChain.size();
+    unsigned int maxLevel = 1;
+    unsigned int sndLevel = 1;
     for (int decide : conflictDecisions) {
-        if (conflictGraph[decide].decideLevel < minLevel) {
-            minLevel = conflictGraph[decide].decideLevel;
+        unsigned int dlevel = conflictGraph[decide].decideLevel;
+        if (dlevel >= maxLevel) {
+            sndLevel = maxLevel;
+            maxLevel = dlevel;
+        }
+        else if (dlevel > sndLevel) {
+            sndLevel = dlevel;
         }
     }
 
@@ -186,29 +213,29 @@ void DPLL::backjump() {
     std::list<int> relatedClauses;
 
     int lastDecide = 0;
-    while (decideChain.size() >= minLevel) {
+    int reverseDecide = 0;
+    while (decideChain.size() > sndLevel) {
         auto last = --decideChain.end();
-        if (decideChain.size() == minLevel) {
+        if (decideChain.size() == maxLevel) {
+            reverseDecide = *last;
+        }
+        if (decideChain.size() == sndLevel + 1) {
             lastDecide = *last;
         }
         decideChain.pop_back();
     }
-    bool should_break = false;;
+
+    std::vector<int> decrepatedNodes;
     while (true) {
         auto last = --runningChain.end();
         int aidx = last->index;
         bool unassign = false;
-        if (last->index != lastDecide) {
-            runningChain.pop_back();
-            interpretations[aidx] = UNDEF;
-            unassign = true;
-        }
-        else {
-            last->is_decide = false;
-            last->value = FALSE;
-            should_break = true;
-            interpretations[aidx] = FALSE;
-        }
+        decrepatedNodes.push_back(aidx);
+
+        runningChain.pop_back();
+        interpretations[aidx] = UNDEF;
+        unassign = true;
+
         LiteralInfoList* infoList = literalInfoMap[aidx];
         for (auto info : *infoList) {
             int cidx = info.clause_index;
@@ -218,10 +245,22 @@ void DPLL::backjump() {
                 relatedClauses.push_back(cidx);
             }
         }
-        if (should_break) { break; }
+        if (aidx == lastDecide) { break; }
     }
+    AtomInfo info;
+    info.index = reverseDecide;
+    info.is_decide = false;
+    info.value = FALSE;
+    runningChain.push_back(info);
+    interpretations[reverseDecide] = FALSE;
+    LiteralInfoList* infoList = literalInfoMap[reverseDecide];
+    for (auto info : *infoList) {
+        int cidx = info.clause_index;
+        --unassignedCount[cidx];
+    }
+
     updateClauseValue(relatedClauses);
-    destroyGraph(conflictDecisions);
+    destroyGraph(decrepatedNodes);
     conflictNodeIndex = 0;
     conflictClause = -1;
 }
@@ -246,13 +285,14 @@ bool DPLL::propagateClause(int cidx) {
     }
     if (use_backjump) {
         for (auto liter : c) {
-            if (liter == propagated) { continue; }
-            conflictGraph[liter].propagations.insert(propagated);
+            int atom = VAR(liter);
+            if (atom == propagated) { continue; }
+            conflictGraph[atom].propagations.insert(propagated);
             conflictGraph[propagated].decideNodes.insert(
-                conflictGraph[liter].decideNodes.begin(),
-                conflictGraph[liter].decideNodes.end()
+                conflictGraph[atom].decideNodes.begin(),
+                conflictGraph[atom].decideNodes.end()
             );
-            conflictGraph[propagated].parents.insert(liter);
+            conflictGraph[propagated].parents.insert(atom);
         }
     }
     return success;
@@ -353,25 +393,24 @@ TrueValue DPLL::evalClause(int cidx) const {
 
 void DPLL::addNewClause(const std::set<int>& conflicts) {
     int n_liter = conflicts.size();
-    clause c(n_liter);
     int cidx = phi.clauses.size();
+    LiteralInfo info;
+    info.sign = NEG;
+    info.clause_index = cidx;
+    clause c;
     for (int atom : conflicts) {
         c.push_back(-atom);
-        LiteralInfo info;
-        info.sign = NEG;
-        info.clause_index = cidx;
         literalInfoMap[atom]->push_back(info);
-        clauseValue.push_back(n_liter == 1 ? UNIT : UNDEF);
-        unassignedCount.push_back(n_liter);
-        GraphNode node;
-        conflictGraph.push_back(node);
     }
+    clauseValue.push_back(n_liter == 1 ? FALSE : UNDEF);
+    unassignedCount.push_back(n_liter - 1);
+    phi.clauses.push_back(c);
 }
 
-void DPLL::destroyGraph(const std::set<int>& conflicts) {
-    for (int atom : conflicts) {
+void DPLL::destroyGraph(const std::vector<int>& nodes) {
+    for (int atom : nodes) {
         conflictGraph[atom].isDecide = false;
-        conflictGraph[atom].decideLevel = 0xffffffff;
+        conflictGraph[atom].decideLevel = 0;
         for (int p : conflictGraph[atom].parents) {
             if (conflictGraph[p].propagations.find(atom)
                 != conflictGraph[p].propagations.end()) {
@@ -380,7 +419,6 @@ void DPLL::destroyGraph(const std::set<int>& conflicts) {
         }
         conflictGraph[atom].parents.clear();
         conflictGraph[atom].decideNodes.clear();
-        destroyGraph(conflictGraph[atom].propagations);
         conflictGraph[atom].propagations.clear();
     }
 }

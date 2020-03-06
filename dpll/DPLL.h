@@ -53,7 +53,9 @@ public:
 
 private:
 
-    bool use_backjump = false;
+    int round = 0;
+
+    bool use_backjump = true;
 
     void init();
     bool dfs();
@@ -80,7 +82,7 @@ private:
     TrueValue evalClause(int cidx) const;
 
     void addNewClause(const std::set<int>& conflicts);
-    void destroyGraph(const std::set<int>& conflicts);
+    void destroyGraph(const std::vector<int>& nodes);
 
     bool sameSign(Sign s, bool pos);
 
@@ -121,7 +123,7 @@ private:
 
     struct GraphNode {
         bool isDecide = false;
-        unsigned int decideLevel = 0xffffffff;
+        unsigned int decideLevel = 0;
         std::set<int> propagations;
         std::set<int> parents;
         std::set<int> decideNodes;
