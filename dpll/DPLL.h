@@ -53,8 +53,6 @@ public:
 
 private:
 
-    int round = 0;
-
     bool use_backjump = true;
 
     void init();

@@ -60,7 +60,6 @@ void DPLL::init() {
 
 bool DPLL::dfs() {
     while (true) {
-        ++round;
         while (propagate());
         decide();
         if (conflict()) {
@@ -188,11 +187,6 @@ void DPLL::backjump() {
         return;
     }
 
-    int chainSize = decideChain.size();
-    int first = -1;
-    if (chainSize > 2) {
-        first = *(++decideChain.begin());
-    }
     addNewClause(conflictDecisions);
 
     unsigned int maxLevel = 1;
