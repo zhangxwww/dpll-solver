@@ -53,8 +53,6 @@ public:
 
 private:
 
-    bool use_backjump = true;
-
     void init();
     bool dfs();
 
@@ -66,24 +64,36 @@ private:
     void backtrack();
     void backjump();
 
+    // Generate the model from interpretations
     void generateModel();
 
+    // Unit propogate according to the clause index
     bool propagateClause(int cidx);
 
+    // Find the next atom to be decided
     int findNextUnusedAtom() const;
 
+    // Decide the atom
     void decideAtom(int atom);
+    // Update the value of all the clauses
+    //    related to the literal
     bool updateInterpretations(int liter, bool is_decide);
+    // Update the cidx clauses when the value of liter changed
     bool updateClauseValue(int liter, int cidx, Sign literalSign);
 
+    // Update all of the clauses in the cs
     bool updateClauseValue(const std::list<int>& cs);
+    // Evaluate the value of the clauses
     TrueValue evalClause(int cidx) const;
 
+    // Add conflict clause according to the conflict reason
     void addNewClause(const std::set<int>& conflicts);
+    // Destroy the conflict graph
     void destroyGraph(const std::vector<int>& nodes);
 
     bool sameSign(Sign s, bool pos);
 
+    bool use_backjump = false;
     formula phi;
 
     struct AtomInfo {
@@ -98,10 +108,8 @@ private:
     // atom (int) :-> Truevalue
     std::vector<TrueValue> interpretations;
 
-    
     // last decided atom
     std::list<int> decideChain;
-
 
     struct LiteralInfo {
         Sign sign = POS;
@@ -136,6 +144,5 @@ private:
 
     model finalModel;
 };
-
 
 #endif //DPLL_DPLL_H

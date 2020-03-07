@@ -358,11 +358,8 @@ bool DPLL::updateClauseValue(int liter, int cidx, Sign literalSign) {
 }
 
 bool DPLL::updateClauseValue(const std::list<int>& cs) {
-    for (auto c = cs.begin();
-        c != cs.end();
-        ++c) {
-
-        clauseValue[*c] = evalClause(*c);
+    for (int c : cs) {
+        clauseValue[c] = evalClause(c);
     }
     return true;
 }
@@ -370,14 +367,11 @@ bool DPLL::updateClauseValue(const std::list<int>& cs) {
 TrueValue DPLL::evalClause(int cidx) const {
     clause cls = phi.clauses[cidx];
     int n_undef = 0;
-    for (auto l = cls.begin();
-        l != cls.end();
-        ++l) {
-
-        int atom = VAR(*l);
+    for (int l : cls) {
+        int atom = VAR(l);
         TrueValue inter = interpretations[atom];
-        if (inter == TRUE && POSITIVE(*l)) { return TRUE; }
-        else if (inter == FALSE && NEGATIVE(*l)) { return TRUE; }
+        if (inter == TRUE && POSITIVE(l)) { return TRUE; }
+        else if (inter == FALSE && NEGATIVE(l)) { return TRUE; }
         else if (inter == UNDEF) { ++n_undef; }
     }
     if (n_undef == 1) { return UNIT; }
